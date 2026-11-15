@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+DenguYosoku/
+DenguYosoku_plots/
+predict_week/
+!requirements*.txt

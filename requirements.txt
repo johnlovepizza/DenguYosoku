@@ -1,0 +1,35 @@
+# ============================================================================
+# DenguYosoku (デング予測) — weekly dengue forecasting, 77 Thai provinces
+# ============================================================================
+# Python 3.14.9  (requirements.txt cannot pin Python itself — use venv/pyenv)
+#
+#   python -m venv .venv
+#   source .venv/bin/activate            # Windows: .venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# Core pins match the environment that produced the reported results, so the
+# run is bit-reproducible with SEED=42 and num_threads=1.
+# ============================================================================
+
+# --- core numerics / data ----------------------------------------------------
+numpy==2.5.4
+pandas==3.1.1
+
+# --- model -------------------------------------------------------------------
+lightgbm==4.7.0
+
+# --- hyperparameter search (Step 6) ------------------------------------------
+optuna>=4.0
+tqdm>=4.66              # study.optimize(show_progress_bar=True)
+
+# --- Optuna visualisation ----------------------------------------------------
+# optuna.visualization returns plotly Figures; kaleido only needed for .png
+plotly>=5.22
+kaleido>=0.2.1
+
+# --- figures -----------------------------------------------------------------
+matplotlib>=3.9
+seaborn>=0.13           # heatmaps in plot_DenguYosoku.py
+
+# --- optional: NOT required by the scripts in this repo ----------------------
+# scikit-learn>=1.5     # only for the older companion pipeline
