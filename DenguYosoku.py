@@ -110,7 +110,7 @@ def loss_line(name, yt, yp):
 # reproducible and the test set never informs a knob. SEED + 1 thread give
 # bit-for-bit reproducibility (LightGBM histogram binning is non-deterministic
 # across threads — the same reason the Hands-On lab fixes random_state).
-CSV            = Path("dengue_full_2003-18_Oct_2026.csv")          # the single source of truth
+CSV            = Path("dengue_cut_2003-18_Oct_2026.csv")          # the single source of truth
 TARGET         = "cases"
 TRAIN_END      = pd.Timestamp("2025-01-01")       # train = week_start < this
 EVAL_CUTOFF    = pd.Timestamp("2026-10-25")       # drop incomplete final week
