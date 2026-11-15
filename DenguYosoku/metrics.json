@@ -1,0 +1,64 @@
+{
+  "frame": {
+    "decision": "Weekly vector-control allocation across 77 Thai provinces",
+    "one_row": "One province in one epidemiological week (Sunday start)",
+    "y": "Reported dengue case count for that province-week",
+    "available": "Cases + weather through week t-1, and the calendar. Nothing from t.",
+    "metric": "MAE in cases vs persistence; decided now, before any result"
+  },
+  "train_end": "2025-01-01",
+  "eval_cutoff": "2026-10-25",
+  "n_train": 87472,
+  "n_test": 7238,
+  "features": [
+    "cases_L1",
+    "cases_L2",
+    "cases_L3",
+    "cases_L4",
+    "cases_L8",
+    "cases_L12",
+    "outbreak_momentum",
+    "cases_L1_relative",
+    "cases_L2_relative",
+    "sin_week",
+    "cos_week",
+    "w_apparent_temperature_mean_L1"
+  ],
+  "case_lags": [
+    1,
+    2,
+    3,
+    4,
+    8,
+    12
+  ],
+  "best_iteration": 600,
+  "objective": "quantile50",
+  "seed": 42,
+  "mae": 3.5175082358112886,
+  "rmse": 6.539507422501503,
+  "r2": 0.9111741938369787,
+  "poisson_deviance": 2.4221758899401484,
+  "wape": 0.2827193387316592,
+  "baseline_mae": {
+    "persistence": 3.963802155291517,
+    "seasonal_naive": 14.770516717325227,
+    "climatology": 11.66596749478761
+  },
+  "skill_vs_persistence": 11.259238024391397,
+  "skill_pct": 11.259238024391397,
+  "paired_dmae": -0.44629391948022823,
+  "paired_ci95": [
+    -0.6496603901867698,
+    -0.30052235359852403
+  ],
+  "verdict": "REAL",
+  "ar_gain_pct": 93.73601714234636,
+  "runtime_sec": 6240.9,
+  "versions": {
+    "python": "3.14.9",
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "lightgbm": "4.7.0"
+  }
+}
