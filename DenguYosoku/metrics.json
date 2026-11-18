@@ -54,7 +54,7 @@
   ],
   "verdict": "REAL",
   "ar_gain_pct": 93.73601714234636,
-  "runtime_sec": 6240.9,
+  "runtime_sec": 257.6,
   "versions": {
     "python": "3.14.9",
     "numpy": "2.5.4",
