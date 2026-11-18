@@ -110,7 +110,7 @@ def loss_line(name, yt, yp):
 # reproducible and the test set never informs a knob. SEED + 1 thread give
 # bit-for-bit reproducibility (LightGBM histogram binning is non-deterministic
 # across threads — the same reason the Hands-On lab fixes random_state).
-CSV            = Path("dengue_cut_2003-18_Oct_2026.csv")          # the single source of truth
+CSV            = Path("dengue_cut_allweeks_2003-18_Oct_2026.csv")     # the single source of truth
 TARGET         = "cases"
 TRAIN_END      = pd.Timestamp("2025-01-01")       # train = week_start < this
 EVAL_CUTOFF    = pd.Timestamp("2026-10-25")       # drop incomplete final week
@@ -118,8 +118,9 @@ SEED, THREADS  = 42, 1                            # 1 thread = reproducible
 N_FOLDS        = 5
 GAP_WEEKS      = 4                                # purge gap in CV folds
 MIN_TRAIN_FRAC = 0.45
+RUN_OPTUNA     = False
 OPTUNA_TRIALS  = 100
-OPTUNA_TIMEOUT = 100*60                            # seconds
+OPTUNA_TIMEOUT = 150*60                            # seconds
 EARLY_STOP     = 150
 MAX_ROUNDS     = 1500
 
@@ -410,7 +411,7 @@ def cv_dev(params, rounds):
     return float(np.mean(devs))
 
 # --- Optuna hyperparameter tuning (train-only) ---
-if HAS_OPTUNA:
+if HAS_OPTUNA and RUN_OPTUNA:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(direction="minimize",
                                 sampler=optuna.samplers.TPESampler(seed=SEED))
@@ -471,7 +472,7 @@ if HAS_OPTUNA:
     BEST = dict(BASE_P, **best)
     say(f"  Optuna best CV deviance: {study.best_value:.4f}")
 else:
-    say("  optuna not installed -> using defaults")
+    say("  Optuna skipped (RUN_OPTUNA=False or not installed) -> default tree params")
     BEST = dict(BASE_P, learning_rate=0.05, num_leaves=63, min_child_samples=30,
                 feature_fraction=0.9, bagging_fraction=0.9, bagging_freq=1,
                 reg_alpha=0.1, reg_lambda=1.0, max_depth=6, path_smooth=1.0)

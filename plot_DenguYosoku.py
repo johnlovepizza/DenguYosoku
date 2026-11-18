@@ -12,6 +12,7 @@ import matplotlib; matplotlib.use("Agg")
 matplotlib.rcParams["axes.unicode_minus"] = False       # ASCII '-' not U+2212
 matplotlib.rcParams["mathtext.fontset"] = "dejavusans"  # log-axis digits
 import matplotlib.pyplot as plt, matplotlib.dates as mdates, matplotlib.font_manager as fm
+import matplotlib.ticker as mticker                     # FIX: plain-text symlog ticks
 import seaborn as sns
 
 # ============================================================
@@ -23,7 +24,6 @@ META = BASE / "DenguYosoku" / "metrics.json"
 IMP  = BASE / "DenguYosoku" / "feature_importance.csv"
 OUT  = BASE / "DenguYosoku_plots"; OUT.mkdir(exist_ok=True)
 IND  = OUT / "province_individual"; IND.mkdir(exist_ok=True)
-
 if not PRED.exists():
     sys.exit(f"ERROR: run DenguYosoku.py first.\nMissing: {PRED}")
 
@@ -35,7 +35,9 @@ avail = {f.name for f in fm.fontManager.ttflist}
 thai = [f for f in ["Noto Sans Thai","Noto Serif Thai","Sarabun","TH Sarabun New","Loma","Garuda"] if f in avail] or ["DejaVu Sans"]
 plt.rcParams.update({"figure.dpi":150,"savefig.dpi":200,"font.size":10,
                      "font.family":thai+["DejaVu Sans"],"axes.unicode_minus":False,
-                     "axes.grid":True,"grid.alpha":0.25})
+                     "axes.grid":True,"grid.alpha":0.25,
+                     # FIX: re-assert AFTER seaborn so mathtext keeps a font with digits
+                     "mathtext.fontset":"dejavusans","mathtext.default":"regular"})
 
 # ============================================================
 # LOAD
@@ -54,22 +56,32 @@ if "residual" not in df.columns:
 df["abs_err"]   = df["residual"].abs()
 df["log_ratio"] = np.log((df["cases"]+1.0)/(df["pred"]+1.0))
 df["month_label"] = df["week_start"].dt.to_period("M").astype(str)
+
 # plots expect 'naive'; alias persistence (the pre-registered bar), not seasonal naive
+# FIX: guard missing columns, coerce dtype, and record what the baseline actually IS
+NAIVE_LABEL = "Naive baseline"
 if "naive" not in df.columns:
-    df["naive"] = df["persist"] if "persist" in df.columns else df["seasonal_naive"]
+    if "persist" in df.columns:
+        df["naive"] = df["persist"];         NAIVE_LABEL = "Persistence (t-1)"
+    elif "seasonal_naive" in df.columns:
+        df["naive"] = df["seasonal_naive"];  NAIVE_LABEL = "Seasonal naive (t-52)"
+    else:
+        df["naive"] = np.nan;                NAIVE_LABEL = "Naive (missing)"
+df["naive"] = pd.to_numeric(df["naive"], errors="coerce")
 
 # master province order (already น่าน-first from the CSV, but lock it)
 PROVINCE_ORDER = list(dict.fromkeys(df["province"]))
 print(f"Rows: {len(df)} | Provinces: {len(PROVINCE_ORDER)} | "
       f"{df['week_start'].min().date()} -> {df['week_start'].max().date()}")
 print(f"First 3 provinces: {PROVINCE_ORDER[:3]}")
+print(f"Baseline plotted as: {NAIVE_LABEL}")
 
 # headline metrics from JSON
 meta = {}
 if META.exists():
     meta = json.loads(META.read_text())
-    print(f"\nDenguYosogu: MAE={meta.get('mae',0):.4f} | R2={meta.get('r2',0):.4f} | "
-          f"WAPE={meta.get('wape',0):.4f} | Skill={meta.get('skill_pct',0):.1f}%")
+print(f"\nDenguYosogu: MAE={meta.get('mae',0):.4f} | R2={meta.get('r2',0):.4f} | "
+      f"WAPE={meta.get('wape',0):.4f} | Skill={meta.get('skill_pct',0):.1f}%")
 
 # ============================================================
 # METRIC HELPERS
@@ -81,11 +93,14 @@ def r2(y,p):
     y=np.asarray(y,float); p=np.clip(np.asarray(p,float),0,None)
     ss=np.sum((y-y.mean())**2)
     return float(1-np.sum((y-p)**2)/ss) if ss>0 else np.nan
-def wape(y,p): return float(np.sum(np.abs(y-p))/np.sum(np.abs(y)))
+def wape(y,p):
+    # FIX: clip predictions like mae/rmse/r2 do, and guard zero denominator
+    y=np.asarray(y,float); p=np.clip(np.asarray(p,float),0,None)
+    d=np.sum(np.abs(y))
+    return float(np.sum(np.abs(y-p))/d) if d>0 else np.nan
 def pdev(y,p):
     y=np.asarray(y,float); p=np.clip(np.asarray(p,float),EPS,None)
     return float(2*np.mean(np.where(y>0,y*np.log((y+EPS)/p),0.0)-(y-p)))
-
 has_naive = "naive" in df.columns and df["naive"].notna().any()
 
 # ============================================================
@@ -94,7 +109,9 @@ has_naive = "naive" in df.columns and df["naive"].notna().any()
 nat = df.groupby("week_start",as_index=False).agg(
     actual=("cases","sum"), predicted=("pred","sum"))
 if has_naive:
-    nat["naive_sum"] = df.groupby("week_start")["naive"].sum().values
+    # FIX: align by week label instead of relying on positional .values
+    nat["naive_sum"] = (df.groupby("week_start")["naive"].sum()
+                          .reindex(nat["week_start"]).to_numpy())
 nat["residual"] = nat["actual"] - nat["predicted"]
 nat["r4a"] = nat["actual"].rolling(4,min_periods=1).mean()
 nat["r4p"] = nat["predicted"].rolling(4,min_periods=1).mean()
@@ -104,11 +121,11 @@ fig,(ax1,ax2) = plt.subplots(2,1,figsize=(16,8.5),sharex=True,
 ax1.plot(nat.week_start, nat.actual, "-o", ms=3, lw=1.8, color="#1f77b4", label="Actual")
 ax1.plot(nat.week_start, nat.predicted, "-s", ms=3, lw=1.8, alpha=.85, color="#d62728", label="Predicted")
 if has_naive:
-    ax1.plot(nat.week_start, nat.naive_sum, "--", lw=1.0, color="#7f7f7f", alpha=.6, label="Seasonal naive")
+    # FIX: was hardcoded "Seasonal naive" while the column is persistence
+    ax1.plot(nat.week_start, nat.naive_sum, "--", lw=1.0, color="#7f7f7f", alpha=.6, label=NAIVE_LABEL)
 ax1.plot(nat.week_start, nat.r4a, lw=2.2, color="#1f77b4", alpha=.45, ls="--", label="Actual 4wk roll")
 ax1.plot(nat.week_start, nat.r4p, lw=2.2, color="#d62728", alpha=.45, ls="--", label="Pred 4wk roll")
 ax1.fill_between(nat.week_start, nat.actual, nat.predicted, color="gray", alpha=.12, label="Gap")
-
 title_extra = ""
 if meta:
     title_extra = (f"\nMAE={meta['mae']:.4f} | RMSE={meta['rmse']:.4f} | "
@@ -116,7 +133,6 @@ if meta:
 ax1.set_title(f"DenguYosogu — National Weekly Dengue Forecast{title_extra}", fontsize=13)
 ax1.set_ylabel("Total cases / week"); ax1.set_ylim(bottom=0)
 ax1.legend(loc="upper left", fontsize=9)
-
 colors = np.where(nat.residual >= 0, "#2ca02c", "#d62728")
 ax2.bar(nat.week_start, nat.residual, width=5, color=colors, alpha=.8)
 ax2.axhline(0, color="k", lw=1)
@@ -137,7 +153,6 @@ for i, prov in enumerate(PROVINCE_ORDER, start=1):
     pm = mae(g.cases, g.pred); pr = rmse(g.cases, g.pred)
     pp = r2(g.cases, g.pred); pb = float(g.residual.mean())
     pw = wape(g.cases.values, np.clip(g.pred.values,0,None))
-
     fig,(ax1,ax2) = plt.subplots(2,1,figsize=(13,5.8),sharex=True,
                                  gridspec_kw={"height_ratios":[3,1]})
     ax1.plot(g.week_start, g.cases, "-o", ms=2.8, lw=1.5, color="#1f77b4", label="Actual")
@@ -149,7 +164,6 @@ for i, prov in enumerate(PROVINCE_ORDER, start=1):
                   fontsize=12)
     ax1.set_ylabel("Cases / week"); ax1.set_ylim(bottom=0)
     ax1.legend(loc="upper left", fontsize=8)
-
     rc = np.where(g.residual.values >= 0, "#2ca02c", "#d62728")
     ax2.bar(g.week_start, g.residual, width=5, color=rc, alpha=.8)
     ax2.axhline(0, color="k", lw=1)
@@ -191,7 +205,6 @@ res_pv = df.pivot_table(index="province", columns="week_start", values="residual
 res_pv = res_pv.reindex(PROVINCE_ORDER)
 res_pv.columns = res_pv.columns.strftime("%Y-%m-%d")
 fh = max(10, 0.17*len(PROVINCE_ORDER)+3)
-
 fig, ax = plt.subplots(figsize=(26, fh))
 sns.heatmap(res_pv, center=0, cmap="RdBu_r", robust=True,
             cbar_kws={"label":"Actual − Predicted"}, ax=ax)
@@ -208,7 +221,6 @@ print("Saved 04_heatmap_residual.png")
 lr_pv = df.pivot_table(index="province", columns="week_start", values="log_ratio", aggfunc="mean")
 lr_pv = lr_pv.reindex(PROVINCE_ORDER)
 lr_pv.columns = lr_pv.columns.strftime("%Y-%m-%d")
-
 fig, ax = plt.subplots(figsize=(26, fh))
 sns.heatmap(lr_pv, center=0, cmap="coolwarm", robust=True,
             cbar_kws={"label":"log((actual+1)/(pred+1))"}, ax=ax)
@@ -226,7 +238,6 @@ act_pv = df.pivot_table(index="province", columns="week_start", values="cases", 
 act_pv = act_pv.reindex(PROVINCE_ORDER); act_pv.columns = act_pv.columns.strftime("%Y-%m-%d")
 prd_pv = df.pivot_table(index="province", columns="week_start", values="pred", aggfunc="mean")
 prd_pv = prd_pv.reindex(PROVINCE_ORDER); prd_pv.columns = prd_pv.columns.strftime("%Y-%m-%d")
-
 fig, axes = plt.subplots(1, 2, figsize=(34, fh))
 sns.heatmap(np.log1p(act_pv), cmap="viridis", ax=axes[0], cbar_kws={"label":"log1p(actual)"})
 axes[0].set_title("Actual weekly cases (log1p)", fontsize=13)
@@ -292,6 +303,10 @@ try:
     axes[1].plot(eb.mid, eb.mae_, "s-", color="#1f77b4", label="mean |error|")
     axes[1].axhline(0, color="k", ls="--", lw=1)
     axes[1].set_xscale("symlog", linthresh=1)
+    # FIX: symlog's default formatter emits mathtext ($\mathdefault{...}$), which was
+    # rendering dummy glyphs. Plain numbers remove the mathtext dependency entirely.
+    axes[1].xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, pos: f"{v:,.0f}"))
+    axes[1].xaxis.set_minor_formatter(mticker.NullFormatter())
     axes[1].set_title("Error by Actual Case Level"); axes[1].set_xlabel("bin midpoint")
     axes[1].set_ylabel("Error"); axes[1].legend()
 except Exception as e:
@@ -326,10 +341,15 @@ df["group"] = df["province"].map(grp)
 sub_rows = []
 for g, sg in df.groupby("group"):
     y = sg.cases.values; p = np.clip(sg.pred.values, 0, None)
-    nm = mae(y, sg.naive.values) if has_naive else np.nan
+    # FIX: score model vs naive on the SAME rows; a single NaN naive used to
+    # poison the whole mean and silently turn skill into NaN.
+    nv = sg.naive.to_numpy(dtype=float) if has_naive else np.full(len(sg), np.nan)
+    ok = np.isfinite(nv)
+    nm = mae(y[ok], nv[ok]) if ok.any() else np.nan
+    pm_paired = mae(y[ok], p[ok]) if ok.any() else np.nan
     sub_rows.append({"group":g, "n_prov":sg.province.nunique(),
                      "MAE":mae(y,p), "WAPE":wape(y,p), "R2":r2(y,p),
-                     "skill_%":(nm-mae(y,p))/nm*100 if nm and nm>0 else np.nan})
+                     "skill_%":(nm-pm_paired)/nm*100 if np.isfinite(nm) and nm>0 else np.nan})
 sub_df = pd.DataFrame(sub_rows).set_index("group").reindex(["small (<5/wk)","medium (5-20)","large (>20/wk)"])
 sub_df.to_csv(OUT/"subgroup_summary.csv", encoding="utf-8-sig")
 
@@ -358,13 +378,20 @@ print(sub_df.round(4).to_string())
 # ============================================================
 # INTERACTIVE (optional)
 # ============================================================
+def mpl_cmap_to_plotly(name, n=11):
+    # FIX: plotly has no 'coolwarm'. Convert the matplotlib cmap so the HTML
+    # uses the same colours as the PNG instead of a different scale.
+    from matplotlib.colors import to_hex
+    cm = matplotlib.colormaps[name]
+    return [[i/(n-1), to_hex(cm(i/(n-1)))] for i in range(n)]
+
 try:
     import plotly.express as px
     for pv, name, scale, lab in [
         (res_pv, "interactive_residual", "RdBu_r", "Actual − Predicted"),
         (lr_pv,  "interactive_logratio", "coolwarm", "log ratio")]:
         f = px.imshow(pv, labels=dict(x="Week",y="Province",color=lab),
-                      color_continuous_scale=scale, aspect="auto",
+                      color_continuous_scale=mpl_cmap_to_plotly(scale), aspect="auto",
                       title=f"DenguYosogu — {name.replace('_',' ').title()}")
         f.update_layout(height=max(900,18*len(PROVINCE_ORDER)), width=2400,
                         font=dict(family=thai[0], size=12))
@@ -374,6 +401,9 @@ try:
     print("Saved interactive HTML heatmaps.")
 except ImportError:
     print("Plotly not installed -> skip interactive (pip install plotly)")
+except Exception as e:
+    # FIX: optional block must never kill the run after all PNGs are written
+    print(f"Interactive skipped: {type(e).__name__}: {e}")
 
 # ============================================================
 # FINAL
@@ -387,7 +417,7 @@ if meta:
     print(f"  WAPE   = {meta['wape']:.4f}")
     print(f"  R2     = {meta['r2']:.4f}")
     print(f"  Skill  = {meta['skill_pct']:.1f}%")
-    print(f"  Holdout: {df['week_start'].min().date()} -> {df['week_start'].max().date()} ({len(df)} rows)")
+print(f"  Holdout: {df['week_start'].min().date()} -> {df['week_start'].max().date()} ({len(df)} rows)")
 print(f"\nAll outputs -> {OUT}")
 for f in sorted(OUT.glob("*.png")): print(f"  {f.name}")
 print(f"  province_individual/ ({len(PROVINCE_ORDER)} files)")
