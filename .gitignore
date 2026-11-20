@@ -1,3 +1,84 @@
-.venv/
+# ============================================================================
+# DenguYosoku (デング予測)
+# ============================================================================
+# COMMITTED ON PURPOSE:
+#   DenguYosoku/                              model + metrics + holdout predictions
+#   predict_week/predict_2026-10-25.csv       77-row demo input (NO 'cases')
+#   predict_week/features.json                12 features, model column order
+#   predict_week/answer_key.csv               truth for that week (see note)
+#   dengue_cut_allweeks_2003-18_Oct_2026.csv  full training panel
+#   dengue_full.csv                           same + blind week, for the plots
+#
+# .gitignore has NO inline comments: '#' only starts a comment at line start.
+# ============================================================================
+
+# --- generated outputs (scratch) --------------------------------------------
+DenguYosoku_plots/
+blind_plots/
+
+# --- blind week: ship the inputs, ignore what the model writes --------------
+# "predict_week/*" (contents), NOT "predict_week/" (the dir itself) — git cannot
+# re-include a file if its parent directory is excluded.
+predict_week/*
+!predict_week/predict_2026-10-25.csv
+!predict_week/features.json
+# Delete the next line to keep the answer private:
+!predict_week/answer_key.csv
+
+# --- input data: allowlist --------------------------------------------------
+# Ignore every stray CSV, then re-include the two we publish.
+# Last matching pattern wins, so the '!' lines MUST come after the ignores.
+dengue_*.csv
+/*.csv
+/data/
+!dengue_cut_allweeks_2003-18_Oct_2026.csv
+!dengue_full.csv
+
+# --- plot_all.py temp scripts -----------------------------------------------
+__plot_all__*.py
+
+# --- Python -----------------------------------------------------------------
 __pycache__/
-!requirements*.txt
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- virtual environments ---------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# --- local config / secrets -------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- logs -------------------------------------------------------------------
+*.log
+nohup.out
+
+# --- editors ----------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---------------------------------------------------------------------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
