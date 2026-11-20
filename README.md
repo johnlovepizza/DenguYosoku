@@ -116,7 +116,7 @@ To switch to a live blind test, remove `answer_key.csv` and drop its `!` line fr
 ## Install
 
 ```bash
-git clone https://github.com/<you>/DenguYosoku.git
+git clone https://github.com/johnlovepizza/DenguYosoku.git
 cd DenguYosoku
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
