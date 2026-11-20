@@ -1,35 +1,62 @@
 # ============================================================================
 # DenguYosoku (デング予測) — weekly dengue forecasting, 77 Thai provinces
 # ============================================================================
-# Python 3.14.9  (requirements.txt cannot pin Python itself — use venv/pyenv)
+# Python 3.14.9 was used for the reported run. requirements.txt cannot pin
+# Python itself — use venv/pyenv.
 #
 #   python -m venv .venv
 #   source .venv/bin/activate            # Windows: .venv\Scripts\activate
-#   pip install -r requirements.txt
+#   pip install -r requirements.txt      # CORE ONLY — runs the whole pipeline
 #
-# Core pins match the environment that produced the reported results, so the
-# run is bit-reproducible with SEED=42 and num_threads=1.
+# Everything below the core block is OPTIONAL and intentionally commented out.
+# Each optional import is wrapped in try/except, so a missing package prints a
+# notice and skips that one output instead of crashing the run.
 # ============================================================================
 
-# --- core numerics / data ----------------------------------------------------
+# --- core numerics / data / model -------------------------------------------
+# Required by DenguYosoku.py, make_blind_holdout.py, predict_2026-10-25.py.
+# These three pins are the environment that produced the reported numbers.
+# AUTHORITY: DenguYosoku/metrics.json -> "versions" (python/numpy/pandas/lightgbm).
+# If this file and metrics.json disagree, trust metrics.json and re-pin here.
 numpy==2.5.4
 pandas==3.1.1
-
-# --- model -------------------------------------------------------------------
 lightgbm==4.7.0
 
-# --- hyperparameter search (Step 6) ------------------------------------------
-optuna>=4.0
-tqdm>=4.66              # study.optimize(show_progress_bar=True)
+# --- figures: required, version-bounded -------------------------------------
+# matplotlib >= 3.9 is a HARD floor, not a preference: skew_split.py calls
+#     ax.boxplot(..., tick_labels=["TRAIN","TEST"])
+# 'labels' was renamed to 'tick_labels' in 3.9; older versions raise TypeError.
+# Upper bounds keep PNG rendering stable across reinstalls.
+matplotlib>=3.9,<4
+seaborn>=0.13,<0.14
 
-# --- Optuna visualisation ----------------------------------------------------
-# optuna.visualization returns plotly Figures; kaleido only needed for .png
-plotly>=5.22
-kaleido>=0.2.1
+# --- OPTIONAL: Optuna hyperparameter search (Step 6) ------------------------
+# Only needed when RUN_OPTUNA=True in DenguYosoku.py (False as shipped).
+# Without it the script prints "Optuna skipped" and uses the hand-set config.
+#   pip install optuna tqdm
+# optuna>=4.0
+# tqdm>=4.66                  # study.optimize(show_progress_bar=True)
 
-# --- figures -----------------------------------------------------------------
-matplotlib>=3.9
-seaborn>=0.13           # heatmaps in plot_DenguYosoku.py
+# --- OPTIONAL: interactive HTML heatmaps ------------------------------------
+# plot_DenguYosoku.py writes interactive_residual.html / interactive_logratio.html.
+# Without plotly it prints "Plotly not installed -> skip interactive" and all
+# PNGs are still written.
+#   pip install plotly
+# plotly>=5.22
 
-# --- optional: NOT required by the scripts in this repo ----------------------
-# scikit-learn>=1.5     # only for the older companion pipeline
+# --- OPTIONAL: Optuna PNG export --------------------------------------------
+# Only for fig.write_image() in Step 6. The .html is always written without it.
+# CAVEAT: plotly 6.x dropped kaleido 0.2.x support; kaleido >= 1.0 also needs a
+# system Chrome/Chromium. Install both together, or neither.
+#   pip install "plotly>=6" "kaleido>=1.0"
+# kaleido>=1.0
+
+# --- not used by any script in this repo ------------------------------------
+# scikit-learn              # only for the older companion pipeline
+
+# ============================================================================
+# For byte-identical figures, freeze the full stack after a verified run:
+#     pip freeze > requirements.lock.txt
+# metrics.json does NOT record matplotlib/seaborn, so the bounds above are the
+# only guard against a future release changing your PNGs.
+# ============================================================================
