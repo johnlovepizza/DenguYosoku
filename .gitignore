@@ -28,6 +28,7 @@ predict_week/*
 # --- input data: allowlist --------------------------------------------------
 # Ignore every stray CSV, then re-include the two we publish.
 # Last matching pattern wins, so the '!' lines MUST come after the ignores.
+dengue_*.csv
 /*.csv
 /data/
 !dengue_cut_allweeks_2003-18_Oct_2026.csv
